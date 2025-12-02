@@ -1,10 +1,10 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
-    <meta charset="utf-8" />
-    <title>Château Mirage 3D AR Bottle</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta charset="utf-8">
+    <title>Château Mirage AR</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
       html, body {
         margin: 0;
@@ -19,6 +19,7 @@
         position: relative;
         width: 100%;
         height: 100%;
+        background: #000;
       }
       #video {
         position: absolute;
@@ -27,37 +28,44 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
-        transform: scaleX(-1);
+        transform: scaleX(-1); /* mirror for selfie-style feel */
         filter: brightness(1.05) contrast(1.05);
       }
-      #three-container {
+      #poster-container {
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60vw;
+        max-width: 420px;
+        box-shadow: 0 0 40px rgba(255, 196, 120, 0.75);
+        border-radius: 12px;
+        overflow: hidden;
+        animation: float 4s ease-in-out infinite alternate,
+                   glow 3.5s ease-in-out infinite alternate;
       }
-      canvas {
-        pointer-events: auto;
+      #poster-container img {
+        display: block;
+        width: 100%;
+        height: auto;
       }
       #hud {
         position: absolute;
         left: 50%;
-        bottom: 14px;
+        bottom: 16px;
         transform: translateX(-50%);
-        padding: 8px 16px;
-        border-radius: 999px;
-        background: linear-gradient(to right, rgba(10,0,30,0.75), rgba(40,0,70,0.75));
         color: #f7e6c9;
         text-align: center;
-        font-size: 13px;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+        padding: 8px 16px;
+        background: linear-gradient(to right, rgba(10, 0, 30, 0.75), rgba(40, 0, 70, 0.75));
+        border-radius: 999px;
+        font-size: 14px;
         max-width: calc(100% - 32px);
-        text-shadow: 0 2px 6px rgba(0,0,0,0.6);
       }
       #hud b {
-        text-transform: uppercase;
         letter-spacing: 0.08em;
+        text-transform: uppercase;
         font-size: 11px;
         opacity: 0.9;
       }
@@ -69,28 +77,37 @@
         color: #fff;
         text-align: center;
         padding: 16px;
-        display: none;
+      }
+      @keyframes float {
+        from { transform: translate(-50%, -52%) scale(1.0); }
+        to   { transform: translate(-50%, -48%) scale(1.04); }
+      }
+      @keyframes glow {
+        from { box-shadow: 0 0 22px rgba(255, 196, 120, 0.55); }
+        to   { box-shadow: 0 0 50px rgba(255, 196, 120, 0.9); }
       }
     </style>
   </head>
   <body>
     <div id="app">
       <video id="video" autoplay playsinline muted></video>
-      <div id="three-container"></div>
+
+      <div id="poster-container">
+        <img src="chateau_mirage_image.jpg" alt="Château Mirage">
+      </div>
+
       <div id="hud">
         <div><b>Château Mirage</b></div>
-        Drag to rotate the bottle · Pinch to zoom
+        Move your phone slowly and imagine stepping into the scene.
       </div>
-      <div id="errorMessage">
+
+      <div id="errorMessage" style="display:none;">
         <p>We could not access your camera.</p>
         <p>Please check browser permissions and reload this page.</p>
       </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
-
     <script>
-      // Camera background
       async function startCamera() {
         const video = document.getElementById('video');
         const errorMessage = document.getElementById('errorMessage');
@@ -112,124 +129,6 @@
       } else {
         document.getElementById('errorMessage').style.display = 'block';
       }
-
-      const container = document.getElementById('three-container');
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
-      camera.position.set(0, 0, 6);
-
-      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio || 1);
-      container.appendChild(renderer.domElement);
-
-      const ambient = new THREE.AmbientLight(0xffffff, 1.0);
-      scene.add(ambient);
-      const dir = new THREE.DirectionalLight(0xffffff, 0.6);
-      dir.position.set(2, 5, 4);
-      scene.add(dir);
-
-      const bottleGroup = new THREE.Group();
-      scene.add(bottleGroup);
-
-      const loader = new THREE.TextureLoader();
-      const frontTex = loader.load('bottle_front.png', () => {
-        console.log('Front texture loaded');
-      }, undefined, (err) => {
-        console.error('Error loading front texture', err);
-      });
-      const backTex = loader.load('bottle_back.png', () => {
-        console.log('Back texture loaded');
-      }, undefined, (err) => {
-        console.error('Error loading back texture', err);
-      });
-
-      frontTex.anisotropy = 8;
-      backTex.anisotropy = 8;
-
-      const aspect = 3.4; // approximate height/width ratio
-      const width = 1.6;
-      const height = width * aspect;
-
-      const geom = new THREE.PlaneGeometry(width, height);
-
-      const matFront = new THREE.MeshBasicMaterial({ map: frontTex, transparent: true });
-      const matBack = new THREE.MeshBasicMaterial({ map: backTex, transparent: true, side: THREE.BackSide });
-
-      const frontMesh = new THREE.Mesh(geom, matFront);
-      const backMesh = new THREE.Mesh(geom, matBack);
-      backMesh.rotation.y = Math.PI;
-
-      bottleGroup.add(frontMesh);
-      bottleGroup.add(backMesh);
-
-      bottleGroup.position.y = -0.2;
-
-      const clock = new THREE.Clock();
-      function animate() {
-        requestAnimationFrame(animate);
-        const t = clock.getElapsedTime();
-        bottleGroup.position.y = -0.2 + Math.sin(t * 1.2) * 0.08;
-        renderer.render(scene, camera);
-      }
-      animate();
-
-      let isPointerDown = false;
-      let lastX = 0;
-      let currentRotation = 0;
-      let baseScale = 1.0;
-      let currentScale = 1.0;
-      let lastDistance = 0;
-
-      function getDistance(touches) {
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        return Math.sqrt(dx*dx + dy*dy);
-      }
-
-      const canvas = renderer.domElement;
-
-      canvas.addEventListener('pointerdown', (e) => {
-        isPointerDown = true;
-        lastX = e.clientX;
-      });
-
-      window.addEventListener('pointermove', (e) => {
-        if (!isPointerDown) return;
-        const deltaX = e.clientX - lastX;
-        lastX = e.clientX;
-        currentRotation += deltaX * 0.01;
-        bottleGroup.rotation.y = currentRotation;
-      });
-
-      window.addEventListener('pointerup', () => { isPointerDown = false; });
-      window.addEventListener('pointerleave', () => { isPointerDown = false; });
-
-      // Touch pinch zoom only
-      canvas.addEventListener('touchstart', (e) => {
-        if (e.touches.length === 2) {
-          lastDistance = getDistance(e.touches);
-          baseScale = currentScale;
-        }
-      }, { passive: true });
-
-      canvas.addEventListener('touchmove', (e) => {
-        if (e.touches.length === 2) {
-          const newDist = getDistance(e.touches);
-          const factor = newDist / lastDistance;
-          currentScale = Math.min(Math.max(0.7, baseScale * factor), 1.8);
-          bottleGroup.scale.set(currentScale, currentScale, currentScale);
-        }
-      }, { passive: true });
-
-      // Resize handling
-      window.addEventListener('resize', () => {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
-      });
     </script>
   </body>
 </html>
