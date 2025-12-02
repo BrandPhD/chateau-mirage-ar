@@ -90,6 +90,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"></script>
 
     <script>
+      // Camera background
       async function startCamera() {
         const video = document.getElementById('video');
         const errorMessage = document.getElementById('errorMessage');
@@ -132,13 +133,21 @@
       scene.add(bottleGroup);
 
       const loader = new THREE.TextureLoader();
-      const frontTex = loader.load('bottle_front.png');
-      const backTex = loader.load('bottle_back.png');
+      const frontTex = loader.load('bottle_front.png', () => {
+        console.log('Front texture loaded');
+      }, undefined, (err) => {
+        console.error('Error loading front texture', err);
+      });
+      const backTex = loader.load('bottle_back.png', () => {
+        console.log('Back texture loaded');
+      }, undefined, (err) => {
+        console.error('Error loading back texture', err);
+      });
 
       frontTex.anisotropy = 8;
       backTex.anisotropy = 8;
 
-      const aspect = 3.4;
+      const aspect = 3.4; // approximate height/width ratio
       const width = 1.6;
       const height = width * aspect;
 
@@ -156,7 +165,7 @@
 
       bottleGroup.position.y = -0.2;
 
-      let clock = new THREE.Clock();
+      const clock = new THREE.Clock();
       function animate() {
         requestAnimationFrame(animate);
         const t = clock.getElapsedTime();
@@ -196,6 +205,7 @@
       window.addEventListener('pointerup', () => { isPointerDown = false; });
       window.addEventListener('pointerleave', () => { isPointerDown = false; });
 
+      // Touch pinch zoom only
       canvas.addEventListener('touchstart', (e) => {
         if (e.touches.length === 2) {
           lastDistance = getDistance(e.touches);
@@ -210,7 +220,16 @@
           currentScale = Math.min(Math.max(0.7, baseScale * factor), 1.8);
           bottleGroup.scale.set(currentScale, currentScale, currentScale);
         }
-      }, { passive: True });
+      }, { passive: true });
+
+      // Resize handling
+      window.addEventListener('resize', () => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      });
     </script>
   </body>
 </html>
