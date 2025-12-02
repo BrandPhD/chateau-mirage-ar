@@ -1,0 +1,392 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Château Mirage Interactive WebAR</title>
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: #000;
+      }
+
+      /* Camera feed */
+      #video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+        filter: brightness(1.05) contrast(1.05);
+      }
+
+      /* Vignette overlay for drama */
+      #vignette {
+        pointer-events: none;
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at center,
+          rgba(0,0,0,0.0) 40%,
+          rgba(0,0,0,0.65) 100%);
+        mix-blend-mode: multiply;
+      }
+
+      /* Poster wrapper that moves / tilts */
+      #poster-wrapper {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) translate3d(0,0,0) scale(1);
+        transform-origin: center center;
+        will-change: transform;
+        pointer-events: auto;
+        touch-action: none;
+      }
+
+      #poster {
+        position: relative;
+        width: min(70vw, 460px);
+        border-radius: 18px;
+        overflow: hidden;
+        background: radial-gradient(circle at top,
+          rgba(20,0,60,0.9),
+          rgba(0,0,0,0.95));
+        box-shadow: 0 0 40px rgba(255, 196, 120, 0.8);
+      }
+
+      #poster img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      /* Light sweep overlay */
+      #light-sweep {
+        pointer-events: none;
+        position: absolute;
+        top: 0;
+        left: -60%;
+        width: 60%;
+        height: 100%;
+        background: linear-gradient(120deg,
+          rgba(255,255,255,0.0) 0%,
+          rgba(255,255,255,0.35) 50%,
+          rgba(255,255,255,0.0) 100%);
+        mix-blend-mode: screen;
+        animation: sweep 4s linear infinite;
+      }
+
+      @keyframes sweep {
+        0% { transform: translateX(-120%); opacity: 0; }
+        15% { opacity: 1; }
+        50% { transform: translateX(160%); opacity: 0; }
+        100% { transform: translateX(160%); opacity: 0; }
+      }
+
+      /* Floating particles */
+      .particle {
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(255, 220, 160, 0.9);
+        box-shadow: 0 0 10px rgba(255, 220, 160, 0.9);
+        animation: floatUp 8s linear infinite;
+        opacity: 0.0;
+      }
+
+      .particle:nth-child(1) { left: 15%; animation-delay: 0s; }
+      .particle:nth-child(2) { left: 40%; animation-delay: 2s; }
+      .particle:nth-child(3) { left: 65%; animation-delay: 4s; }
+      .particle:nth-child(4) { left: 80%; animation-delay: 6s; }
+
+      @keyframes floatUp {
+        0% { top: 105%; opacity: 0; transform: translateY(0) scale(0.8); }
+        10% { opacity: 1; }
+        60% { opacity: 1; }
+        100% { top: -10%; opacity: 0; transform: translateY(-20px) scale(1.05); }
+      }
+
+      /* HUD */
+      #hud {
+        position: absolute;
+        left: 50%;
+        bottom: 14px;
+        transform: translateX(-50%);
+        padding: 10px 18px;
+        border-radius: 999px;
+        background: linear-gradient(to right,
+          rgba(10,0,35,0.82),
+          rgba(40,0,70,0.82));
+        color: #f7e6c9;
+        font-size: 13px;
+        text-align: center;
+        max-width: calc(100% - 40px);
+        text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+      }
+
+      #hud b {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 11px;
+        opacity: 0.95;
+        display: block;
+        margin-bottom: 2px;
+      }
+
+      #errorMessage {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #fff;
+        text-align: center;
+        padding: 16px;
+        display: none;
+      }
+
+      /* Tasting notes panel */
+      #notes-toggle {
+        position: absolute;
+        right: 10px;
+        bottom: 10px;
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        background: rgba(5,0,20,0.9);
+        border: 1px solid rgba(255, 215, 180, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #f7e6c9;
+        font-size: 18px;
+        box-shadow: 0 0 18px rgba(0,0,0,0.8);
+      }
+
+      #notes-panel {
+        position: absolute;
+        left: 50%;
+        bottom: 70px;
+        transform: translateX(-50%) translateY(120%);
+        width: min(84vw, 420px);
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: radial-gradient(circle at top,
+          rgba(25,0,55,0.96),
+          rgba(5,0,20,0.98));
+        color: #f7e6c9;
+        font-size: 13px;
+        box-shadow: 0 18px 40px rgba(0,0,0,0.9);
+        text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.4s ease, opacity 0.4s ease;
+      }
+
+      #notes-panel.visible {
+        transform: translateX(-50%) translateY(0%);
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      #notes-panel h2 {
+        margin: 0 0 6px 0;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      #notes-panel p {
+        margin: 2px 0;
+        line-height: 1.3;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app">
+      <video id="video" autoplay playsinline muted></video>
+      <div id="vignette"></div>
+
+      <div id="poster-wrapper">
+        <div id="poster">
+          <img src="chateau-mirage-poster.jpg" alt="Château Mirage Poster">
+
+          <div id="light-sweep"></div>
+
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+
+          <div id="notes-toggle">i</div>
+        </div>
+      </div>
+
+      <div id="notes-panel">
+        <h2>Château Mirage · Tasting Notes</h2>
+        <p><strong>Color</strong> Deep, luminous ruby that catches the light like a distant signal in the night.</p>
+        <p><strong>Nose</strong> Ripe blackberry, a whisper of soft smoke, and warm earth after rainfall.</p>
+        <p><strong>Palate</strong> Silky and layered, guiding you into a scene that feels imagined yet real.</p>
+        <p><strong>Finish</strong> Long and lingering, like the last line of a story you are not ready to leave.</p>
+      </div>
+
+      <div id="hud">
+        <b>Château Mirage WebAR</b>
+        Move your phone · Tilt slightly to feel the scene shift · Drag to adjust · Pinch to resize · Tap “i” for tasting notes
+      </div>
+
+      <div id="errorMessage">
+        <p>We could not access your camera.</p>
+        <p>Please check browser permissions and reload this page.</p>
+      </div>
+    </div>
+
+    <script>
+      // Camera
+      async function startCamera() {
+        const video = document.getElementById("video");
+        const errorMessage = document.getElementById("errorMessage");
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+            audio: false
+          });
+          video.srcObject = stream;
+        } catch (e) {
+          console.error(e);
+          errorMessage.style.display = "block";
+        }
+      }
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        startCamera();
+      } else {
+        document.getElementById("errorMessage").style.display = "block";
+      }
+
+      // Interaction: drag, pinch, tilt, tasting notes
+      (function () {
+        const wrapper = document.getElementById("poster-wrapper");
+        const notesToggle = document.getElementById("notes-toggle");
+        const notesPanel = document.getElementById("notes-panel");
+
+        let offsetX = 0, offsetY = 0;
+        let startX = 0, startY = 0;
+        let dragging = false;
+
+        let scale = 1;
+        let baseScale = 1;
+        let startDist = 0;
+
+        let tiltX = 0;
+        let tiltY = 0;
+
+        function updateTransform() {
+          wrapper.style.transform =
+            `translate(calc(-50% + ${offsetX}px), calc(-50% + ${offsetY}px)) 
+             translate3d(0,0,0) 
+             scale(${scale}) 
+             rotateX(${tiltX}deg) 
+             rotateY(${tiltY}deg)`;
+        }
+
+        function dist(touches) {
+          const dx = touches[0].clientX - touches[1].clientX;
+          const dy = touches[0].clientY - touches[1].clientY;
+          return Math.hypot(dx, dy);
+        }
+
+        // Tasting notes toggle
+        notesToggle.addEventListener("click", () => {
+          notesPanel.classList.toggle("visible");
+        });
+
+        // Touch events
+        wrapper.addEventListener("touchstart", e => {
+          if (e.touches.length === 1) {
+            dragging = true;
+            startX = e.touches[0].clientX - offsetX;
+            startY = e.touches[0].clientY - offsetY;
+          } else if (e.touches.length === 2) {
+            dragging = false;
+            startDist = dist(e.touches);
+            baseScale = scale;
+          }
+        }, { passive: true });
+
+        wrapper.addEventListener("touchmove", e => {
+          if (e.touches.length === 1 && dragging) {
+            offsetX = e.touches[0].clientX - startX;
+            offsetY = e.touches[0].clientY - startY;
+            updateTransform();
+          } else if (e.touches.length === 2) {
+            const newDist = dist(e.touches);
+            if (startDist > 0) {
+              const factor = newDist / startDist;
+              scale = Math.min(Math.max(0.6, baseScale * factor), 2.4);
+              updateTransform();
+            }
+          }
+        }, { passive: true });
+
+        wrapper.addEventListener("touchend", e => {
+          if (e.touches.length === 0) {
+            dragging = false;
+          }
+        });
+
+        // Mouse drag (desktop)
+        wrapper.addEventListener("mousedown", e => {
+          dragging = true;
+          startX = e.clientX - offsetX;
+          startY = e.clientY - offsetY;
+        });
+
+        window.addEventListener("mousemove", e => {
+          if (!dragging) return;
+          offsetX = e.clientX - startX;
+          offsetY = e.clientY - startY;
+          updateTransform();
+        });
+
+        window.addEventListener("mouseup", () => { dragging = false; });
+
+        // Device tilt for subtle parallax
+        if (window.DeviceOrientationEvent) {
+          window.addEventListener("deviceorientation", e => {
+            const beta = e.beta || 0;  // front-back
+            const gamma = e.gamma || 0; // left-right
+
+            const maxTilt = 8;
+            tiltX = Math.max(-maxTilt, Math.min(maxTilt, beta / 10));
+            tiltY = Math.max(-maxTilt, Math.min(maxTilt, gamma / 10));
+
+            updateTransform();
+          });
+        } else {
+          updateTransform();
+        }
+
+        // Initial position
+        updateTransform();
+      })();
+    </script>
+  </body>
+</html>
