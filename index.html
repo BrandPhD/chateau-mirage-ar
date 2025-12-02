@@ -2,140 +2,133 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="utf-8">
     <title>Château Mirage AR</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.3.0/dist/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.3/aframe/build/aframe-ar.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-      body, html { margin: 0; overflow: hidden; background: #000; }
-      .loading {
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top, #2e0b59, #000000);
-        z-index: 5;
+      }
+      #app {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: #000;
+      }
+      #video {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1); /* mirror for selfie-style feel */
+        filter: brightness(1.05) contrast(1.05);
+      }
+      #poster-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60vw;
+        max-width: 420px;
+        box-shadow: 0 0 40px rgba(255, 196, 120, 0.75);
+        border-radius: 12px;
+        overflow: hidden;
+        animation: float 4s ease-in-out infinite alternate,
+                   glow 3.5s ease-in-out infinite alternate;
+      }
+      #poster-container img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      #hud {
+        position: absolute;
+        left: 50%;
+        bottom: 16px;
+        transform: translateX(-50%);
+        color: #f7e6c9;
+        text-align: center;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+        padding: 8px 16px;
+        background: linear-gradient(to right, rgba(10, 0, 30, 0.75), rgba(40, 0, 70, 0.75));
+        border-radius: 999px;
+        font-size: 14px;
+        max-width: calc(100% - 32px);
+      }
+      #hud b {
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 11px;
+        opacity: 0.9;
+      }
+      #errorMessage {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #fff;
+        text-align: center;
+        padding: 16px;
+      }
+      @keyframes float {
+        from { transform: translate(-50%, -52%) scale(1.0); }
+        to   { transform: translate(-50%, -48%) scale(1.04); }
+      }
+      @keyframes glow {
+        from { box-shadow: 0 0 22px rgba(255, 196, 120, 0.55); }
+        to   { box-shadow: 0 0 50px rgba(255, 196, 120, 0.9); }
       }
     </style>
   </head>
-
   <body>
-    <div class="loading" id="loadingMessage">
-      Move your camera to find the AR marker (HIRO)
+    <div id="app">
+      <video id="video" autoplay playsinline muted></video>
+
+      <div id="poster-container">
+        <img src="chateau_mirage_image.jpg" alt="Château Mirage">
+      </div>
+
+      <div id="hud">
+        <div><b>Château Mirage</b></div>
+        Move your phone slowly and imagine stepping into the scene.
+      </div>
+
+      <div id="errorMessage" style="display:none;">
+        <p>We could not access your camera.</p>
+        <p>Please check browser permissions and reload this page.</p>
+      </div>
     </div>
 
-    <a-scene
-      embedded
-      vr-mode-ui="enabled: false"
-      renderer="logarithmicDepthBuffer: true; antialias: true"
-      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
-      loading-screen="enabled: false"
-      >
-
-      <!-- Soft ambient light so the image is easy to see -->
-      <a-entity light="type: ambient; intensity: 1"></a-entity>
-
-      <!-- Château Mirage animated poster -->
-      <a-image
-        id="poster"
-        src="chateau_mirage_image.jpg"
-        position="0 0 0"
-        rotation="-90 0 0"
-        width="1"
-        height="1.6"
-        opacity="0.0"
-        >
-        <!-- Fade in -->
-        <a-animation
-          attribute="opacity"
-          from="0.0"
-          to="1.0"
-          dur="2000"
-          begin="markerFound">
-        </a-animation>
-
-        <!-- Gentle floating motion -->
-        <a-animation
-          attribute="position"
-          from="0 0 0"
-          to="0 0.1 0"
-          direction="alternate"
-          dur="3000"
-          repeat="indefinite"
-          easing="easeInOutSine">
-        </a-animation>
-
-        <!-- Subtle breathing scale -->
-        <a-animation
-          attribute="scale"
-          from="1 1 1"
-          to="1.05 1.05 1.05"
-          direction="alternate"
-          dur="3500"
-          repeat="indefinite"
-          easing="easeInOutSine">
-        </a-animation>
-      </a-image>
-
-      <!-- Soft glow behind the poster -->
-      <a-ring
-        position="0 0 -0.02"
-        rotation="-90 0 0"
-        radius-inner="0.55"
-        radius-outer="0.9"
-        color="#ffb347"
-        opacity="0.15">
-        <a-animation
-          attribute="scale"
-          from="1 1 1"
-          to="1.3 1.3 1.3"
-          direction="alternate"
-          dur="2800"
-          repeat="indefinite"
-          easing="easeInOutSine">
-        </a-animation>
-        <a-animation
-          attribute="opacity"
-          from="0.05"
-          to="0.25"
-          direction="alternate"
-          dur="2800"
-          repeat="indefinite"
-          easing="easeInOutSine">
-        </a-animation>
-      </a-ring>
-
-      <!-- Marker camera (use printed HIRO marker) -->
-      <a-marker-camera preset="hiro" emitevents="true"></a-marker-camera>
-    </a-scene>
-
     <script>
-      // Hide loading message once AR starts
-      const scene = document.querySelector('a-scene');
-      const loadingMessage = document.getElementById('loadingMessage');
-      const markerCamera = document.querySelector('a-marker-camera');
+      async function startCamera() {
+        const video = document.getElementById('video');
+        const errorMessage = document.getElementById('errorMessage');
 
-      scene.addEventListener('loaded', () => {
-        if (loadingMessage) {
-          loadingMessage.textContent = "Point your camera at the HIRO marker to reveal Château Mirage";
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false
+          });
+          video.srcObject = stream;
+        } catch (err) {
+          console.error('Camera error:', err);
+          errorMessage.style.display = 'block';
         }
-      });
+      }
 
-      markerCamera.addEventListener('markerFound', () => {
-        if (loadingMessage) {
-          loadingMessage.style.display = 'none';
-        }
-      });
-
-      markerCamera.addEventListener('markerLost', () => {
-        if (loadingMessage) {
-          loadingMessage.style.display = 'flex';
-          loadingMessage.textContent = "Marker lost. Move your camera back to the HIRO marker.";
-        }
-      });
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        startCamera();
+      } else {
+        document.getElementById('errorMessage').style.display = 'block';
+      }
     </script>
   </body>
 </html>
