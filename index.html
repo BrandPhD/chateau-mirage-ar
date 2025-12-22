@@ -215,6 +215,113 @@
         margin: 2px 0;
         line-height: 1.3;
       }
+
+      /* AI detection hold button */
+      #ai-detector {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 20;
+        display: grid;
+        gap: 8px;
+        padding: 12px 12px 10px 12px;
+        border-radius: 16px;
+        background: radial-gradient(circle at top,
+          rgba(25,0,55,0.88),
+          rgba(5,0,20,0.92));
+        border: 1px solid rgba(255, 215, 180, 0.5);
+        box-shadow: 0 14px 28px rgba(0,0,0,0.65);
+        color: #f7e6c9;
+        width: min(78vw, 320px);
+        backdrop-filter: blur(6px);
+      }
+
+      #ai-detector-title {
+        margin: 0;
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        opacity: 0.95;
+      }
+
+      #ai-detector-row {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 10px;
+        align-items: center;
+      }
+
+      #ai-hold {
+        appearance: none;
+        -webkit-appearance: none;
+        border: none;
+        border-radius: 14px;
+        padding: 12px 12px;
+        background: linear-gradient(135deg,
+          rgba(255, 210, 160, 0.95),
+          rgba(255, 175, 110, 0.92));
+        color: rgba(10, 0, 25, 0.95);
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-align: left;
+        cursor: pointer;
+        user-select: none;
+        touch-action: none; /* ensures pointer events behave as expected */
+        box-shadow: 0 10px 22px rgba(0,0,0,0.45);
+      }
+
+      #ai-hold:focus-visible {
+        outline: 3px solid rgba(255, 220, 170, 0.85);
+        outline-offset: 3px;
+      }
+
+      #ai-hold[disabled] {
+        opacity: 0.65;
+        cursor: not-allowed;
+      }
+
+      #ai-hold .sub {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        opacity: 0.9;
+        margin-top: 2px;
+      }
+
+      #ai-hold .time {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .ai-progress {
+        --p: 0;
+        width: 52px;
+        height: 52px;
+        border-radius: 999px;
+        background:
+          conic-gradient(rgba(255, 230, 190, 0.95) calc(var(--p) * 1turn),
+                        rgba(255, 230, 190, 0.12) 0);
+        display: grid;
+        place-items: center;
+        box-shadow: inset 0 0 0 1px rgba(255, 215, 180, 0.45),
+                    0 10px 22px rgba(0,0,0,0.5);
+      }
+
+      .ai-progress::after {
+        content: "";
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: rgba(10,0,35,0.82);
+        box-shadow: inset 0 0 0 1px rgba(255, 215, 180, 0.25);
+      }
+
+      #ai-status {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.25;
+        opacity: 0.95;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      }
     </style>
   </head>
 
@@ -244,6 +351,18 @@
         <p><strong>Nose</strong> Ripe blackberry, a whisper of soft smoke, and warm earth after rainfall.</p>
         <p><strong>Palate</strong> Silky and layered, guiding you into a scene that feels imagined yet real.</p>
         <p><strong>Finish</strong> Long and lingering, like the last line of a story you are not ready to leave.</p>
+      </div>
+
+      <div id="ai-detector" role="region" aria-label="AI detector">
+        <p id="ai-detector-title">AI Detector</p>
+        <div id="ai-detector-row">
+          <div class="ai-progress" id="ai-progress" aria-hidden="true"></div>
+          <button id="ai-hold" type="button" aria-describedby="ai-status">
+            Press &amp; hold to verify
+            <span class="sub">Hold for <span class="time" id="ai-time">10.0</span>s</span>
+          </button>
+        </div>
+        <p id="ai-status">Hold the button down continuously for 10 seconds.</p>
       </div>
 
       <div id="hud">
@@ -386,6 +505,130 @@
 
         // Initial position
         updateTransform();
+      })();
+
+      // AI detector: press-and-hold for 10 seconds
+      (function () {
+        const HOLD_MS = 10_000;
+
+        const btn = document.getElementById("ai-hold");
+        const status = document.getElementById("ai-status");
+        const ring = document.getElementById("ai-progress");
+        const timeEl = document.getElementById("ai-time");
+
+        let isHolding = false;
+        let verified = false;
+        let holdStart = 0;
+        let rafId = 0;
+        let activePointerId = null;
+
+        function setProgress(p) {
+          const clamped = Math.max(0, Math.min(1, p));
+          ring.style.setProperty("--p", String(clamped));
+        }
+
+        function setTimeRemaining(msRemaining) {
+          const s = Math.max(0, msRemaining) / 1000;
+          timeEl.textContent = s.toFixed(1);
+        }
+
+        function finishVerified() {
+          verified = true;
+          isHolding = false;
+          activePointerId = null;
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = 0;
+
+          setProgress(1);
+          setTimeRemaining(0);
+          btn.disabled = true;
+          btn.setAttribute("aria-pressed", "true");
+          btn.textContent = "Verified (human)";
+          status.textContent = "Result: Human verified. (AI detector passed)";
+        }
+
+        function tick(now) {
+          if (!isHolding || verified) return;
+          const elapsed = now - holdStart;
+          const p = elapsed / HOLD_MS;
+          setProgress(p);
+          setTimeRemaining(HOLD_MS - elapsed);
+
+          if (elapsed >= HOLD_MS) {
+            finishVerified();
+            return;
+          }
+          rafId = requestAnimationFrame(tick);
+        }
+
+        function startHold() {
+          if (verified || isHolding) return;
+          isHolding = true;
+          holdStart = performance.now();
+          status.textContent = "Keep holding…";
+          btn.setAttribute("aria-pressed", "true");
+          rafId = requestAnimationFrame(tick);
+        }
+
+        function cancelHold(reason) {
+          if (verified || !isHolding) return;
+          isHolding = false;
+          activePointerId = null;
+          if (rafId) cancelAnimationFrame(rafId);
+          rafId = 0;
+          setProgress(0);
+          setTimeRemaining(HOLD_MS);
+          btn.setAttribute("aria-pressed", "false");
+          status.textContent = reason || "Hold interrupted. Try again.";
+        }
+
+        // Pointer (mouse + touch + pen)
+        btn.addEventListener("pointerdown", (e) => {
+          if (verified) return;
+          // Only track one pointer at a time.
+          if (activePointerId !== null) return;
+          activePointerId = e.pointerId;
+          btn.setPointerCapture(e.pointerId);
+          startHold();
+        });
+
+        btn.addEventListener("pointerup", (e) => {
+          if (activePointerId !== e.pointerId) return;
+          cancelHold("Released early. Hold for the full 10 seconds.");
+        });
+
+        btn.addEventListener("pointercancel", (e) => {
+          if (activePointerId !== e.pointerId) return;
+          cancelHold("Hold cancelled. Try again.");
+        });
+
+        btn.addEventListener("pointerleave", () => {
+          // If the pointer leaves while holding, treat as cancel (common on desktop).
+          cancelHold("Pointer left button. Try again.");
+        });
+
+        // Keyboard accessibility: Space / Enter to hold
+        btn.addEventListener("keydown", (e) => {
+          if (verified) return;
+          if (e.code === "Space" || e.code === "Enter") {
+            e.preventDefault();
+            startHold();
+          }
+        });
+
+        btn.addEventListener("keyup", (e) => {
+          if (e.code === "Space" || e.code === "Enter") {
+            e.preventDefault();
+            cancelHold("Key released early. Hold for the full 10 seconds.");
+          }
+        });
+
+        // If the page loses focus mid-hold, cancel.
+        window.addEventListener("blur", () => cancelHold("Focus lost. Try again."));
+
+        // Initial UI state
+        setProgress(0);
+        setTimeRemaining(HOLD_MS);
       })();
     </script>
   </body>
